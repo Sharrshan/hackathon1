@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Auth System</title>
+    <style>
+        :root {
+            --primary: #4a6fa5;
+            --secondary: #166088;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --safe: #d4edda;
+            --safe-text: #155724;
+            --weak: #fff3cd;
+            --weak-text: #856404;
+            --compromised: #f8d7da;
+            --compromised-text: #721c24;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: var(--dark);
+        }
+
+        .container {
+            width: 90%;
+            max-width: 500px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+        }
+
+        .form-wrapper {
+            display: none;
+        }
+
+        .form-wrapper.active {
+            display: block;
+        }
+
+        h2 {
+            margin-bottom: 1.5rem;
+            color: var(--secondary);
+            text-align: center;
+        }
+
+        .input-group {
+            margin-bottom: 1.2rem;
+            position: relative;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        button {
+            width: 100%;
+            padding: 0.8rem;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: var(--secondary);
+        }
+
+        .toggle-password {
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            width: auto;
+            display: inline-block;
+        }
+
+        .toggle-password:hover {
+            background-color: var(--secondary);
+        }
+
+        .toggle-form {
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .toggle-form a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .password-strength {
+            height: 5px;
+            background-color: #eee;
+            margin-top: 0.5rem;
+            border-radius: 5px;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .password-feedback {
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+
+        .safe-feedback {
+            background-color: var(--safe);
+            color: var(--safe-text);
+        }
+
+        .weak-feedback {
+            background-color: var(--weak);
+            color: var(--weak-text);
+        }
+
+        .compromised-feedback {
+            background-color: var(--compromised);
+            color: var(--compromised-text);
+        }
+
+        .location-denied, .distance-info {
+            color: orange;
+            margin-top: 0.5rem;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .lockout-message {
+            color: red;
+            margin-top: 1rem;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .home-link {
+            display: none;
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .home-link a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="login-form" class="form-wrapper active">
+            <h2>Login</h2>
+            <form id="login">
+                <div class="input-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" required aria-describedby="login-email-error">
+                </div>
+                <div class="input-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" required aria-describedby="login-password-error login-feedback">
+                    <button type="button" class="toggle-password">Show</button>
+                    <div id="login-strength" class="password-strength"></div>
+                    <div id="login-feedback" class="password-feedback" role="alert"></div>
+                </div>
+                <input type="hidden" id="latitude" name="latitude">
+                <input type="hidden" id="longitude" name="longitude">
+                <div id="location-error" class="location-denied"></div>
+                <div id="distance-info" class="distance-info"></div>
+                <button type="submit">Login</button>
+            </form>
+            <div class="toggle-form">
+                <p>Don't have an account? <a href="#" id="show-signup">Sign Up</a></p>
+            </div>
+            <div class="home-link" id="home-link">
+                <p><a href="home.html">Go to Homepage</a></p>
+            </div>
+        </div>
+
+        <div id="signup-form" class="form-wrapper">
+            <h2>Sign Up</h2>
+            <form id="signup">
+                <div class="input-group">
+                    <label for="signup-email">Email</label>
+                    <input type="email" id="signup-email" required aria-describedby="signup-email-error">
+                </div>
+                <div class="input-group">
+                    <label for="signup-password">Password</label>
+                    <input type="password" id="signup-password" required aria-describedby="signup-password-error signup-feedback">
+                    <button type="button" class="toggle-password">Show</button>
+                    <div id="signup-strength" class="password-strength"></div>
+                    <div id="signup-feedback" class="password-feedback" role="alert"></div>
+                </div>
+                <div class="input-group">
+                    <label for="signup-confirm">Confirm Password</label>
+                    <input type="password" id="signup-confirm" required aria-describedby="signup-confirm-error">
+                    <button type="button" class="toggle-password">Show</button>
+                </div>
+                <button type="submit">Sign Up</button>
+            </form>
+            <div class="toggle-form">
+                <p>Already have an account? <a href="#" id="show-login">Login</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Form elements
+            const loginForm = document.getElementById('login-form');
+            const signupForm = document.getElementById('signup-form');
+            const showSignup = document.getElementById('show-signup');
+            const showLogin = document.getElementById('show-login');
+            const loginFormEl = document.getElementById('login');
+            const signupFormEl = document.getElementById('signup');
+            const loginPassword = document.getElementById('login-password');
+            const signupPassword = document.getElementById('signup-password');
+            const loginStrength = document.getElementById('login-strength');
+            const signupStrength = document.getElementById('signup-strength');
+            const loginFeedback = document.getElementById('login-feedback');
+            const signupFeedback = document.getElementById('signup-feedback');
+            const latitudeInput = document.getElementById('latitude');
+            const longitudeInput = document.getElementById('longitude');
+            const locationErrorDiv = document.getElementById('location-error');
+            const distanceInfoDiv = document.getElementById('distance-info');
+            const homeLink = document.getElementById('home-link');
+
+            let loginAttempts = 0;
+            const maxAttempts = 4;
+            let lockoutTimeout = null;
+            let firstAttemptPassword = null;
+            let isSecondAttempt = false;
+            const homeIpAddress = "8.8.8.8"; // Example public IP (Google DNS)
+
+            // Debounce function
+            function debounce(func, wait) {
+                let timeout;
+                return function (...args) {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => func.apply(this, args), wait);
+                };
+            }
+
+            // Geo-fencing functions
+            async function getIpAddress() {
+                try {
+                    const response = await fetch('https://api64.ipify.org?format=json');
+                    const data = await response.json();
+                    return data.ip;
+                } catch (error) {
+                    console.error("Error getting IP address:", error);
+                    distanceInfoDiv.textContent = "Could not determine IP address.";
+                    return null;
+                }
+            }
+
+            async function getGeolocationFromIp(ipAddress) {
+                if (!ipAddress) return null;
+                try {
+                    const response = await fetch(`https://ipapi.co/${ipAddress}/json/`);
+                    const data = await response.json();
+                    if (data.latitude && data.longitude) {
+                        return { latitude: data.latitude, longitude: data.longitude };
+                    }
+                    console.warn("Could not get geolocation from IP:", data);
+                    distanceInfoDiv.textContent = "Could not determine location from IP.";
+                    return null;
+                } catch (error) {
+                    console.error("Error getting geolocation from IP:", error);
+                    distanceInfoDiv.textContent = "Error determining location from IP.";
+                    return null;
+                }
+            }
+
+            function calculateDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371; // Radius of the earth in km
+                const dLat = deg2rad(lat2 - lat1);
+                const dLon = deg2rad(lon2 - lon1);
+                const a =
+                    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                const d = R * c; // Distance in km
+                return d;
+            }
+
+            function deg2rad(deg) {
+                return deg * (Math.PI / 180);
+            }
+
+            async function checkLoginFormVisibility() {
+                if (loginForm.classList.contains('active')) {
+                    const currentIp = await getIpAddress();
+                    if (currentIp && homeIpAddress) {
+                        const currentLocation = await getGeolocationFromIp(currentIp);
+                        const homeLocation = await getGeolocationFromIp(homeIpAddress);
+                        if (currentLocation && homeLocation) {
+                            const distance = calculateDistance(
+                                currentLocation.latitude,
+                                currentLocation.longitude,
+                                homeLocation.latitude,
+                                homeLocation.longitude
+                            );
+                            distanceInfoDiv.textContent = `Distance from home IP: ~${distance.toFixed(2)} km (IP-based, approximate)`;
+                            latitudeInput.value = currentLocation.latitude;
+                            longitudeInput.value = currentLocation.longitude;
+                        } else {
+                            distanceInfoDiv.textContent = "Could not calculate distance from home IP.";
+                        }
+                    }
+                } else {
+                    distanceInfoDiv.textContent = '';
+                    locationErrorDiv.textContent = '';
+                    latitudeInput.value = '';
+                    longitudeInput.value = '';
+                }
+            }
+
+            // Toggle forms
+            showSignup.addEventListener('click', (e) => {
+                e.preventDefault();
+                loginForm.classList.remove('active');
+                signupForm.classList.add('active');
+                loginFormEl.reset();
+                resetPasswordUI(loginStrength, loginFeedback);
+                firstAttemptPassword = null;
+                isSecondAttempt = false;
+                loginAttempts = 0;
+                loginForm.querySelector('.lockout-message')?.remove();
+                distanceInfoDiv.textContent = '';
+                locationErrorDiv.textContent = '';
+                homeLink.style.display = 'none'; // Hide home link when switching to signup
+            });
+
+            showLogin.addEventListener('click', (e) => {
+                e.preventDefault();
+                signupForm.classList.remove('active');
+                loginForm.classList.add('active');
+                signupFormEl.reset();
+                resetPasswordUI(signupStrength, signupFeedback);
+                firstAttemptPassword = null;
+                isSecondAttempt = false;
+                loginAttempts = 0;
+                loginForm.querySelector('.lockout-message')?.remove();
+                checkLoginFormVisibility();
+                homeLink.style.display = 'none'; // Hide home link when switching to login
+            });
+
+            function resetPasswordUI(strengthElement, feedbackElement) {
+                strengthElement.style.width = '0';
+                strengthElement.style.backgroundColor = '';
+                feedbackElement.textContent = '';
+                feedbackElement.className = 'password-feedback';
+            }
+
+            async function checkPasswordStrength(password, strengthElement, feedbackElement) {
+                if (!password) {
+                    resetPasswordUI(strengthElement, feedbackElement);
+                    return;
+                }
+
+                let strength = 0;
+                if (password.length >= 8) strength += 1;
+                if (password.length >= 12) strength += 1;
+                if (/[A-Z]/.test(password)) strength += 1;
+                if (/[0-9]/.test(password)) strength += 1;
+                if (/[^A-Za-z0-9]/.test(password)) strength += 1;
+
+                let width = (strength / 5) * 100;
+                let color = '#e63946';
+                if (strength > 2 && strength <= 4) color = '#ffbe0b';
+                if (strength > 4) color = '#2a9d8f';
+
+                strengthElement.style.width = `${width}%`;
+                strengthElement.style.backgroundColor = color;
+
+                try {
+                    const isLeaked = await checkHIBP(password);
+                    if (isLeaked) {
+                        feedbackElement.className = 'password-feedback compromised-feedback';
+                        feedbackElement.innerHTML = '🚨 <strong>Compromised!</strong> This password was found in data breaches.';
+                    } else if (strength <= 2) {
+                        feedbackElement.className = 'password-feedback weak-feedback';
+                        feedbackElement.innerHTML = '⚠️ <strong>Weak Password.</strong> Use 12+ chars, mix letters, numbers, symbols.';
+                    } else {
+                        feedbackElement.className = 'password-feedback safe-feedback';
+                        feedbackElement.innerHTML = '🟢 <strong>Strong Password!</strong> No breaches found.';
+                    }
+                } catch (error) {
+                    feedbackElement.className = 'password-feedback weak-feedback';
+                    feedbackElement.innerHTML = '⚠️ Unable to verify password safety. Try again later.';
+                }
+            }
+
+            loginPassword.addEventListener('input', debounce(() => {
+                checkPasswordStrength(loginPassword.value, loginStrength, loginFeedback);
+            }, 500));
+
+            signupPassword.addEventListener('input', debounce(() => {
+                checkPasswordStrength(signupPassword.value, signupStrength, signupFeedback);
+            }, 500));
+
+            signupFormEl.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const confirm = document.getElementById('signup-confirm').value;
+                if (signupPassword.value !== confirm) {
+                    signupFeedback.className = 'password-feedback compromised-feedback';
+                    signupFeedback.textContent = 'Passwords do not match!';
+                    return;
+                }
+
+                try {
+                    const isLeaked = await checkHIBP(signupPassword.value);
+                    if (isLeaked) {
+                        signupFeedback.className = 'password-feedback compromised-feedback';
+                        signupFeedback.textContent = 'This password has been compromised. Choose another.';
+                        return;
+                    }
+
+                    alert('Account created successfully! Please login.');
+                    signupForm.classList.remove('active');
+                    loginForm.classList.add('active');
+                    signupFormEl.reset();
+                    resetPasswordUI(signupStrength, signupFeedback);
+                } catch (error) {
+                    signupFeedback.className = 'password-feedback weak-feedback';
+                    signupFeedback.textContent = 'Unable to verify password. Try again later.';
+                }
+            });
+
+            loginFormEl.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const enteredPassword = loginPassword.value;
+                const correctPassword = "DSATMICB";
+
+                if (lockoutTimeout) {
+                    showLockoutMessage('Account locked. Please try again later.');
+                    return;
+                }
+
+                if (!isSecondAttempt) {
+                    firstAttemptPassword = enteredPassword;
+                    isSecondAttempt = true;
+                    loginAttempts++;
+                    showLockoutMessage(`Incorrect password. ${maxAttempts - loginAttempts} attempts remaining.`);
+                    if (loginAttempts >= maxAttempts) {
+                        loginPassword.disabled = true;
+                        document.getElementById('login-email').disabled = true;
+                        e.target.querySelector('button[type="submit"]').disabled = true;
+                        showLockoutMessage(`Account locked for 15 minutes after ${maxAttempts} failed attempts.`);
+                        lockoutTimeout = setTimeout(() => {
+                            loginPassword.disabled = false;
+                            document.getElementById('login-email').disabled = false;
+                            e.target.querySelector('button[type="submit"]').disabled = false;
+                            loginAttempts = 0;
+                            lockoutTimeout = null;
+                            firstAttemptPassword = null;
+                            isSecondAttempt = false;
+                            loginForm.querySelector('.lockout-message')?.remove();
+                            homeLink.style.display = 'none';
+                        }, 15 * 60 * 1000);
+                    }
+                    return;
+                }
+
+                if (enteredPassword === correctPassword && enteredPassword === firstAttemptPassword) {
+                    homeLink.style.display = 'block'; // Show the home link
+                    window.location.href = 'home.html'; // Redirect to homepage
+                    loginAttempts = 0;
+                    firstAttemptPassword = null;
+                    isSecondAttempt = false;
+                    loginFormEl.reset();
+                    resetPasswordUI(loginStrength, loginFeedback);
+                    loginForm.querySelector('.lockout-message')?.remove();
+                } else {
+                    loginAttempts++;
+                    firstAttemptPassword = null;
+                    isSecondAttempt = false;
+                    if (loginAttempts >= maxAttempts) {
+                        loginPassword.disabled = true;
+                        document.getElementById('login-email').disabled = true;
+                        e.target.querySelector('button[type="submit"]').disabled = true;
+                        showLockoutMessage(`Account locked for 15 minutes after ${maxAttempts} failed attempts.`);
+                        lockoutTimeout = setTimeout(() => {
+                            loginPassword.disabled = false;
+                            document.getElementById('login-email').disabled = false;
+                            e.target.querySelector('button[type="submit"]').disabled = false;
+                            loginAttempts = 0;
+                            lockoutTimeout = null;
+                            firstAttemptPassword = null;
+                            isSecondAttempt = false;
+                            loginForm.querySelector('.lockout-message')?.remove();
+                            homeLink.style.display = 'none';
+                        }, 15 * 60 * 1000);
+                    } else {
+                        showLockoutMessage(`Incorrect password. ${maxAttempts - loginAttempts} attempts remaining.`);
+                    }
+                }
+            });
+
+            function showLockoutMessage(message) {
+                let msg = loginForm.querySelector('.lockout-message');
+                if (!msg) {
+                    msg = document.createElement('div');
+                    msg.className = 'lockout-message';
+                    loginForm.appendChild(msg);
+                }
+                msg.textContent = message;
+            }
+
+            // Password visibility toggle
+            document.querySelectorAll('.toggle-password').forEach(button => {
+                button.addEventListener('click', () => {
+                    const input = button.previousElementSibling;
+                    const isPassword = input.type === 'password';
+                    input.type = isPassword ? 'text' : 'password';
+                    button.textContent = isPassword ? 'Hide' : 'Show';
+                });
+            });
+
+            // Initial geolocation check
+            checkLoginFormVisibility();
+
+            // Password Health Checker (unused in this context, retained for compatibility)
+            async function checkPassword() {
+                const password = document.getElementById('passwordInput')?.value;
+                const resultDiv = document.getElementById('result');
+                if (!password || !resultDiv) return;
+
+                const strength = analyzeStrength(password);
+                try {
+                    const isLeaked = await checkHIBP(password);
+                    if (isLeaked) {
+                        resultDiv.className = 'password-feedback compromised-feedback';
+                        resultDiv.innerHTML = '🚨 <strong>Compromised!</strong> This password was found in data breaches.';
+                    } else if (strength === 'weak') {
+                        resultDiv.className = 'password-feedback weak-feedback';
+                        resultDiv.innerHTML = '⚠️ <strong>Weak Password.</strong> Use 12+ chars, mix letters, numbers, and symbols.';
+                    } else {
+                        resultDiv.className = 'password-feedback safe-feedback';
+                        resultDiv.innerHTML = '🟢 <strong>Strong Password!</strong> No breaches found.';
+                    }
+                } catch (error) {
+                    resultDiv.className = 'password-feedback weak-feedback';
+                    resultDiv.textContent = '⚠️ Unable to verify password safety. Try again later.';
+                }
+            }
+
+            function analyzeStrength(password) {
+                if (password.length < 8) return 'weak';
+                if (!/[A-Z]/.test(password) || !/[0-9]/.test(password)) return 'weak';
+                return 'strong';
+            }
+
+            async function checkHIBP(password) {
+                const encoder = new TextEncoder();
+                const data = encoder.encode(password);
+                const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+
+                const prefix = hashHex.substring(0, 5);
+                const suffix = hashHex.substring(5);
+
+                try {
+                    const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`);
+                    const hashes = response.ok ? await response.text() : '';
+                    const lines = hashes.split('\n');
+                    return lines.some(line => line.split(':')[0] === suffix);
+                } catch (error) {
+                    console.error('Error checking HIBP:', error);
+                    throw error;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
